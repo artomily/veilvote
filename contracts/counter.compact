@@ -1,0 +1,73 @@
+// =============================================================================
+// VeilVote — a privacy-preserving yes/no voting contract
+// =============================================================================
+//
+// PRIVACY MODEL
+// -------------
+//   PUBLIC  (on-chain ledger, visible to everyone):
+//     * yesVotes / noVotes  — the running tallies
+//     * nullifiers          — the set of "used" nullifier hashes
+//
+//   PRIVATE (never leaves the voter's machine):
+//     * voterSecretKey()    — the voter's secret identity key (a witness)
+//
+//   WHAT A VOTER PROVES WITHOUT REVEALING IT:
+//     * "I am an eligible voter (I know a secret key) and I have not voted
+//        before" — proven by publishing only a one-way nullifier hash of the
+//        secret key. The tally moves, but the ledger never learns *who* voted,
+//        and two votes by the same key are rejected because the nullifier
+//        would already be present in the public set.
+//
+// SCOPE OF PRIVACY: VeilVote hides voter *identity*. The direction of each
+// individual ballot (yes vs no) is inherently public — an observer sees which
+// tally moves — so `castVote` discloses that boolean on purpose. Hiding the
+// per-ballot direction would require a committed/homomorphic tally, which is
+// out of scope here.
+//
+// The two `disclose(...)` calls below are the deliberate, auditable points
+// where private values become public: (1) the nullifier hash, and (2) the vote
+// direction. The secret key itself is never disclosed.
+// =============================================================================
+
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+// ---- Public ledger state ----------------------------------------------------
+export ledger yesVotes: Counter;
+export ledger noVotes: Counter;
+export ledger nullifiers: Set<Bytes<32>>;
+
+// ---- Private witness --------------------------------------------------------
+// Supplied locally by each voter; the compiler forbids it from reaching public
+// state unless explicitly wrapped in disclose().
+witness voterSecretKey(): Bytes<32>;
+
+// ---- Pure helper: derive a domain-separated nullifier from a secret key -----
+// persistentHash is a one-way function, so the nullifier reveals nothing about
+// the secret key while remaining stable across contract upgrades.
+export circuit deriveNullifier(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>(
+    [pad(32, "veilvote:nullifier:"), sk]
+  );
+}
+
+// ---- Transition: cast a single anonymous vote -------------------------------
+export circuit castVote(voteYes: Boolean): [] {
+  // Compute the nullifier from the PRIVATE key, then deliberately disclose only
+  // the hash so it can be checked against and stored in the PUBLIC set.
+  const n = disclose(deriveNullifier(voterSecretKey()));
+
+  // Anti double-vote: reject if this nullifier was already used.
+  assert(!nullifiers.member(n), "This voter has already cast a vote");
+  nullifiers.insert(n);
+
+  // The per-ballot direction is public by design, so disclose it deliberately
+  // before it moves a public tally.
+  const choice = disclose(voteYes);
+  if (choice) {
+    yesVotes.increment(1);
+  } else {
+    noVotes.increment(1);
+  }
+}

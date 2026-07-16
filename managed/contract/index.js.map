@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../",
+  "sources": ["contracts/counter.compact", "compiler/standard-library.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EA+BA;;;;;;;;;;;;;MAiBA,AAAA,eAIC;;OAAA;MAGD,AAAA,QAiBC;;;;;cAjBuB,SAAgB;;;;;;;;;;;;;;;;;;yCAAhB,SAAgB;;;;;;;qEAAhB,SAAgB;;;OAiBvC;;;;GACA;EA1CD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;IAKA;;;;;;;;;yEAAgC;IAChC;;;;;;;;;yEAA+B;IAC/B;;;;;;;;;;yEAAyC;;;;;;;GAmCxC;ECzED,AAAA,kBAAA;oEAAA;;;ED2CA,AAAA,iBAAoC;;0DAApC,cAAoC;;;;;;;;;;;;;;GAAA;EAKpC,AAAA,kBAIC,CAJ8B,IAAa;;mCAEP,IAAE;GAEtC;EAGD,AAAA,WAiBC,4BAjBuB,SAAgB;UAGhC,GAA+C;;qDAG7C;;;;;;;;;;;4KAAkB,GAAC;;;;0HAAT;;IAClB;;;;;;;;;;2HAAkB,GAAC;;;;;wEAAT;UAIJ,QAA0B,GAAR,SAAO;QAC3B,QAAM;YACR,KAAQ;MAAR;;;;;;;;;;+FAAA,KAAQ;;;;0EAAA;;YAER,KAAO;MAAP;;;;;;;;;;+FAAA,KAAO;;;;0EAAA;;;GAEV;;;;;;;;;;;;;;;;IApCD;qCAAA;;;;;;;;;;;0GAAgC;KAAA;IAChC;qCAAA;;;;;;;;;;;0GAA+B;KAAA;IAC/B;;;;;uCAAA;;;;;;;;;;;;;;;;4GAAyC;;;;;;uCAAzC;;;;;;;;;;;;4GAAyC;;;;;;;;;;;;;;uCAAzC;;;;;;;;;;;;;;;4GAAyC;;;;;;;;;KAAA;;;;;;;;EAUzC,AAAA,eAIC;;;;UAJ8B,IAAa;;;;;;;;6CAAb,IAAa;GAI3C;;;;"
+}

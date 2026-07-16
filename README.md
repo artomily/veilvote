@@ -1,36 +1,129 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VeilVote
 
-## Getting Started
+> A privacy-preserving yes/no voting contract on Midnight: anonymous ballots with cryptographic double-vote protection.
 
-First, run the development server:
+## Contract Address
+
+| Network  | Address                              |
+|----------|--------------------------------------|
+| Preview  | _[PASTE ADDRESS AFTER DEPLOY]_       |
+| Preprod  | _[PASTE ADDRESS AFTER DEPLOY]_       |
+
+> Not yet deployed on-chain. Deploying requires a running Docker proof server and a
+> faucet-funded wallet — see [Deploying to a network](#deploying-to-a-network). The
+> contract **compiles** (`managed/` is generated) and **all tests pass** locally today.
+
+## What This Does
+
+VeilVote runs a simple **yes/no poll**. Anyone who holds a secret voter key can cast
+exactly one ballot. The public ledger keeps the running `yes`/`no` tallies and a set of
+"used" nullifiers. When you vote, the contract publishes only a **one-way hash** of your
+secret key (a *nullifier*) — never the key itself. That hash lets the contract prove you
+haven't voted before **without learning who you are**. A second vote from the same key is
+rejected because its nullifier is already in the public set.
+
+## Privacy Model
+
+- **PUBLIC (on-chain, visible to anyone):**
+  - `yesVotes` / `noVotes` — the running tallies (`Counter`).
+  - `nullifiers` — the set of used nullifier hashes (`Set<Bytes<32>>`).
+  - The **direction** of each individual ballot (which tally moved) is inherently public.
+- **PRIVATE (a witness — never leaves the voter's machine, never on-chain):**
+  - `voterSecretKey()` — the voter's secret identity key.
+- **What the voter PROVES without revealing it:**
+  - "I know an eligible voter's secret key **and** I have not voted before" — proven by
+    publishing only `persistentHash("veilvote:nullifier:" ‖ secretKey)`. Voter **identity**
+    stays hidden; double-votes are impossible because the nullifier is deterministic.
+
+The two deliberate `disclose(...)` calls in [`contracts/counter.compact`](contracts/counter.compact)
+are the only points where private data becomes public: the nullifier hash and the vote
+direction. Everything else is private by default, enforced by the Compact compiler.
+
+## Tech Stack
+
+- **Midnight** network (Preview / Preprod testnets)
+- **Compact** smart-contract language — `pragma language_version 0.23`, compiler `0.31.1`
+- **`@midnight-ntwrk/compact-runtime`** `0.16.0` (contract runtime + test simulator)
+- **Node.js v22**, **Docker** (proof server), **Vitest** (tests)
+
+## Prerequisites
+
+- **Node.js v22** (the Midnight toolchain is pinned to v22; newer majors can break builds).
+  Recommended via [nvm](https://github.com/nvm-sh/nvm): `nvm install 22 && nvm use 22`.
+- **Compact toolchain** — install the devtools, then the compiler:
+  ```bash
+  curl --proto '=https' --tlsv1.2 -LsSf \
+    https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+  # restart your shell (adds ~/.local/bin to PATH), then:
+  compact update          # installs the latest compiler (0.31.x)
+  compact --version
+  ```
+- **Docker** — required only to deploy (runs the proof server). Install
+  [Docker Desktop](https://docs.docker.com/desktop/) and start it.
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <this-repo> veilvote
+cd veilvote
+nvm use 22
+npm install
+npm run compact      # compiles contracts/counter.compact -> managed/
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run compact` regenerates the `managed/` directory (circuits, proving/verifier keys,
+and the TypeScript contract API).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run Tests
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test             # vitest run — exercises the compiled circuits via the simulator
+# or, compile first then test:
+npm run test:compile
+```
 
-## Learn More
+The suite ([`tests/counter.test.ts`](tests/counter.test.ts)) covers circuit logic
+(tallies move correctly), state transitions (multiple voters + double-vote rejection),
+and privacy (the secret key never reaches public state; distinct keys yield distinct
+nullifiers).
 
-To learn more about Next.js, take a look at the following resources:
+## Deploying to a network
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Deploy is **not** run automatically (it needs Docker + a funded wallet). Once ready:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# 1. Start the proof server (in a separate terminal)
+docker pull midnightnetwork/proof-server
+docker run -p 6300:6300 midnightnetwork/proof-server
 
-## Deploy on Vercel
+# 2. Deploy (Node needs extra heap for proof generation)
+nvm use 22
+NODE_OPTIONS="--max-old-space-size=12288" npm run deploy -- --network preview
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Stop when the **wallet address** prints, fund it at the **Preview faucet**, then let the
+deploy finish. Paste the resulting **contract address** into the table at the top of this
+file.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project Structure
+
+```
+veilvote/
+├── contracts/counter.compact   # the VeilVote Compact contract
+├── managed/                    # generated by `npm run compact` (circuits + keys)
+├── tests/                      # simulator + Vitest suite
+│   ├── witnesses.ts            # private state + voterSecretKey witness
+│   ├── veilvote-simulator.ts   # in-memory test harness
+│   └── counter.test.ts         # the tests
+├── src/                        # frontend (Level 2)
+├── .github/workflows/          # CI/CD (Level 3)
+└── README.md
+```
+
+## Initial Idea
+
+_[LEAVE PLACEHOLDER — fill this in manually.]_
+
+## Screenshots
+
+_[LEAVE PLACEHOLDER — add `compact compile` output and the deployed contract address.]_
