@@ -2,16 +2,26 @@
 
 > A privacy-preserving DAO voting contract on Midnight: anonymous, eligibility-checked ballots with cryptographic double-vote protection.
 
+## Live Demo
+
+_[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" below]_
+
 ## Contract Address
 
-| Network  | Address                              |
-|----------|--------------------------------------|
-| Preview  | _[PASTE ADDRESS AFTER DEPLOY]_       |
-| Preprod  | _[PASTE ADDRESS AFTER DEPLOY]_       |
+| Network  | Address                          |
+|----------|----------------------------------|
+| Preprod  | _[PASTE ADDRESS AFTER DEPLOY]_   |
 
-> Not yet deployed on-chain. Deploying requires a running Docker proof server and a
-> faucet-funded wallet — see [Deploying to a network](#deploying-to-a-network). The
-> contract **compiles** (`managed/` is generated) and **all tests pass** locally today.
+> **Not yet deployed.** Deploying to Preprod needs a funded wallet and — depending on
+> your wallet's proving mode — a local proof server (see [Prerequisites](#prerequisites)
+> and [Proving: no Docker required (usually)](#proving-no-docker-required-usually)).
+> Everything that doesn't require a live network is done and verified: the contract
+> **compiles**, **all 6 tests pass**, and the frontend **builds with no errors**
+> (`npm run build` in `frontend/`, confirmed against the compiled contract).
+>
+> Once you deploy (via the frontend's own "Deploy a new proposal" button, wallet
+> connected), paste the resulting contract address here — this field is mandatory before
+> submitting.
 
 ## What This Does
 
@@ -60,15 +70,35 @@ only for comparison), the nullifier hash, and the vote direction. The secret key
 Merkle path are never disclosed — everything else is private by default, enforced by the
 Compact compiler.
 
+## Privacy Claim
+
+**What an on-chain observer sees:** which contract instance (proposal) a transaction
+called, that *some* eligible member cast a ballot, which way that ballot went (yes/no —
+the running tally), and an opaque 32-byte nullifier that prevents that same member voting
+again on this proposal.
+
+**What an on-chain observer cannot see, ever:** which member voted (their secret key and
+Merkle path are never transmitted or disclosed — only proven, in zero-knowledge, to
+satisfy the membership check), their position in the member list, or any link between a
+member's votes across two different proposals (nullifiers are proposal-bound, so the same
+member's ballots on different proposals are cryptographically unlinkable).
+
 ## Tech Stack
 
-- **Midnight** network (Preview / Preprod testnets)
+- **Midnight** network (Preprod testnet)
 - **Compact** smart-contract language — `pragma language_version 0.23`, compiler `0.31.1`
-- **`@midnight-ntwrk/compact-runtime`** `0.16.0` (contract runtime + test simulator)
-- **Node.js v22**, **Docker** (proof server), **Vitest** (tests)
+- **Midnight.js SDK** — `midnight-js-contracts`, `-fetch-zk-config-provider`,
+  `-http-client-proof-provider`, `-indexer-public-data-provider`, `-network-id`,
+  `-types`, `-utils` (all `4.1.1`), plus `@midnight-ntwrk/compact-js` `2.5.1` and
+  `@midnight-ntwrk/dapp-connector-api` `4.0.1`
+- **React + Vite** frontend (`frontend/`), **Lace wallet** for wallet connection and
+  proving
+- **Node.js v22**, **Vitest** (contract tests)
 
 ## Prerequisites
 
+- **Lace wallet** installed in your browser, connected to **Preprod**, with some tDUST
+  from the [Preprod faucet](https://docs.midnight.network/develop/tutorial/using/faucet).
 - **Node.js v22** (the Midnight toolchain is pinned to v22; newer majors can break builds).
   Recommended via [nvm](https://github.com/nvm-sh/nvm): `nvm install 22 && nvm use 22`.
 - **Compact toolchain** — install the devtools, then the compiler:
@@ -79,21 +109,40 @@ Compact compiler.
   compact update          # installs the latest compiler (0.31.x)
   compact --version
   ```
-- **Docker** — required only to deploy (runs the proof server). Install
-  [Docker Desktop](https://docs.docker.com/desktop/) and start it.
 
-## Setup
+### Proving: no Docker required (usually)
+
+VeilVote's frontend prefers **wallet-delegated proving**: it fetches the compiled
+circuit's ZK artifacts itself (over HTTP, from wherever the frontend is hosted) and hands
+them to the wallet via `connectedAPI.getProvingProvider(...)`, so the *wallet* generates
+the proof. If your installed Lace version doesn't yet support that, the app falls back to
+the older model, which needs a **local proof server on `localhost:6300`**:
+```bash
+docker run -p 6300:6300 midnightnetwork/proof-server
+```
+and your wallet's proof-server setting pointed at it. Either way, proving always happens
+on the machine running the wallet — this codebase never sends your private inputs
+anywhere to be proven.
+
+## Run Locally
 
 ```bash
 git clone <this-repo> veilvote
 cd veilvote
 nvm use 22
 npm install
-npm run compact      # compiles contracts/counter.compact -> managed/
+npm run compact          # compiles contracts/counter.compact -> managed/
+
+cd frontend
+npm install
+cp .env.example .env     # set VITE_CONTRACT_ADDRESS once you've deployed (optional)
+npm run dev              # http://localhost:5173
 ```
 
-`npm run compact` regenerates the `managed/` directory (circuits, proving/verifier keys,
-and the TypeScript contract API).
+`npm run compact` (from the repo root) regenerates `managed/` (circuits, proving/verifier
+keys, the TypeScript contract API) — run it again any time you edit the `.compact` file.
+`frontend`'s `dev`/`build` scripts copy `managed/keys` and `managed/zkir` into
+`frontend/public/` automatically, so the ZK artifacts ship with the app.
 
 ## Run Tests
 
@@ -101,33 +150,41 @@ and the TypeScript contract API).
 npm test             # vitest run — exercises the compiled circuits via the simulator
 # or, compile first then test:
 npm run test:compile
+
+cd frontend && npm run typecheck   # frontend type-checks against the compiled contract
 ```
 
-The suite ([`tests/counter.test.ts`](tests/counter.test.ts), 6 tests) covers: circuit logic
-(tallies move correctly), **eligibility / Sybil resistance** (a non-member key is rejected
-even with a forged path), state transitions (multiple eligible members + double-vote
-rejection), **cross-proposal unlinkability** (the same member's nullifier differs across
-two proposals), and privacy (the secret key and Merkle path never reach public state).
-[`tests/merkle.ts`](tests/merkle.ts) builds the eligibility tree off-chain using the
-contract's own compiled `pureCircuits`, so tests hash exactly the way the circuit does.
+The contract suite ([`tests/counter.test.ts`](tests/counter.test.ts), 6 tests) covers:
+circuit logic (tallies move correctly), **eligibility / Sybil resistance** (a non-member
+key is rejected even with a forged path), state transitions (multiple eligible members +
+double-vote rejection), **cross-proposal unlinkability** (the same member's nullifier
+differs across two proposals), and privacy (the secret key and Merkle path never reach
+public state). [`tests/merkle.ts`](tests/merkle.ts) builds the eligibility tree off-chain
+using the contract's own compiled `pureCircuits`, so tests hash exactly the way the
+circuit does.
 
-## Deploying to a network
+## Deploying the frontend
 
-Deploy is **not** run automatically (it needs Docker + a funded wallet). Once ready:
+`vercel.json` (or `netlify.toml`) at the repo root builds the `frontend/` app while
+keeping `managed/` (one level up) in the build context — **don't** set the platform's
+"Root Directory" to `frontend`, or the build loses access to the compiled contract.
 
 ```bash
-# 1. Start the proof server (in a separate terminal)
-docker pull midnightnetwork/proof-server
-docker run -p 6300:6300 midnightnetwork/proof-server
+# Vercel
+npm i -g vercel
+vercel login
+vercel --prod        # run from the repo root
 
-# 2. Deploy (Node needs extra heap for proof generation)
-nvm use 22
-NODE_OPTIONS="--max-old-space-size=12288" npm run deploy -- --network preview
+# Netlify
+npm i -g netlify-cli
+netlify login
+netlify deploy --prod   # run from the repo root
 ```
 
-Stop when the **wallet address** prints, fund it at the **Preview faucet**, then let the
-deploy finish. Paste the resulting **contract address** into the table at the top of this
-file.
+Set `VITE_NETWORK_ID=preprod` and, once you've deployed a proposal contract,
+`VITE_CONTRACT_ADDRESS=<address>` as environment variables on the hosting platform (or
+leave `VITE_CONTRACT_ADDRESS` unset and use the in-app "Deploy a new proposal" /
+"Join" flow instead). Paste the resulting live URL into **Live Demo** above.
 
 ## Project Structure
 
@@ -140,8 +197,19 @@ veilvote/
 │   ├── merkle.ts                # off-chain eligibility Merkle tree builder
 │   ├── veilvote-simulator.ts   # in-memory test harness
 │   └── counter.test.ts         # the tests
-├── src/                        # frontend (Level 2)
+├── frontend/                   # React + Vite DApp UI (Level 2)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── WalletConnect.tsx   # connect/disconnect + address display
+│   │   │   └── CircuitCall.tsx     # cast-vote button, proof/result UI
+│   │   ├── hooks/useMidnight.ts    # wallet + providers + deploy/join/vote
+│   │   ├── midnight/                # providers, compiled-contract binding, deploy/join
+│   │   ├── eligibility.ts           # demo eligibility Merkle tree
+│   │   └── App.tsx
+│   ├── vite.config.ts
+│   └── vercel.json-friendly build (see repo-root vercel.json)
 ├── .github/workflows/          # CI/CD (Level 3)
+├── vercel.json / netlify.toml  # frontend deploy config
 └── README.md
 ```
 
@@ -152,3 +220,7 @@ _[LEAVE PLACEHOLDER — fill this in manually.]_
 ## Screenshots
 
 _[LEAVE PLACEHOLDER — add `compact compile` output and the deployed contract address.]_
+
+## Demo Video
+
+_[PLACEHOLDER — add the link after recording. See the demo checklist provided alongside this README for what to capture.]_

@@ -1,0 +1,100 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.app__header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.app__section {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.app__contract-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.app__tally {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.app__hint {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.app__error {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, red 12%, transparent);
+}
+
+.wallet-connect {
+  margin-top: 1rem;
+}
+
+.wallet-connect--connected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wallet-connect__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: inline-block;
+}
+
+.wallet-connect__address {
+  font-family: monospace;
+}
+
+.wallet-connect__error {
+  color: #ef4444;
+  font-size: 0.9rem;
+}
+
+.circuit-call__buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.circuit-call__status {
+  opacity: 0.8;
+  font-style: italic;
+}
+
+.circuit-call__result {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+}
+
+.circuit-call__proof-label {
+  font-weight: 600;
+}
+
+.circuit-call__note {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
