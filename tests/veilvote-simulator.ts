@@ -13,20 +13,23 @@ import {
   ledger,
   pureCircuits,
 } from "../managed/contract/index.js";
-import {
-  type VeilVotePrivateState,
-  witnesses,
-} from "./witnesses.js";
+import { type VeilVotePrivateState, witnesses } from "./witnesses.js";
 
 export class VeilVoteSimulator {
   readonly contract: Contract<VeilVotePrivateState>;
   circuitContext: CircuitContext<VeilVotePrivateState>;
 
-  constructor(secretKey: Uint8Array) {
+  constructor(
+    privateState: VeilVotePrivateState,
+    proposalId: Uint8Array,
+    eligibleRoot: Uint8Array,
+  ) {
     this.contract = new Contract<VeilVotePrivateState>(witnesses);
     const { currentPrivateState, currentContractState, currentZswapLocalState } =
       this.contract.initialState(
-        createConstructorContext({ secretKey }, "0".repeat(64)),
+        createConstructorContext(privateState, "0".repeat(64)),
+        proposalId,
+        eligibleRoot,
       );
     this.circuitContext = createCircuitContext(
       sampleContractAddress(),
@@ -36,9 +39,9 @@ export class VeilVoteSimulator {
     );
   }
 
-  /** Impersonate a different voter (a distinct secret key) on the same board. */
-  public switchVoter(secretKey: Uint8Array): void {
-    this.circuitContext.currentPrivateState = { secretKey };
+  /** Impersonate a different voter (a distinct secret key + Merkle path). */
+  public switchVoter(privateState: VeilVotePrivateState): void {
+    this.circuitContext.currentPrivateState = privateState;
   }
 
   public getLedger(): Ledger {
@@ -58,8 +61,11 @@ export class VeilVoteSimulator {
     return this.getLedger();
   }
 
-  /** The public nullifier that would be produced by a given secret key. */
-  public static nullifierFor(secretKey: Uint8Array): Uint8Array {
-    return pureCircuits.deriveNullifier(secretKey);
+  /** The public nullifier a given (proposal, secret key) pair would produce. */
+  public static nullifierFor(
+    proposalId: Uint8Array,
+    secretKey: Uint8Array,
+  ): Uint8Array {
+    return pureCircuits.deriveNullifier(proposalId, secretKey);
   }
 }

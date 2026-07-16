@@ -1,65 +1,133 @@
 // =============================================================================
-// VeilVote — a privacy-preserving yes/no voting contract
+// VeilVote — a privacy-preserving DAO voting contract
 // =============================================================================
 //
 // PRIVACY MODEL
 // -------------
 //   PUBLIC  (on-chain ledger, visible to everyone):
-//     * yesVotes / noVotes  — the running tallies
-//     * nullifiers          — the set of "used" nullifier hashes
+//     * proposalId    — identifies which proposal this deployed contract is for
+//     * eligibleRoot   — Merkle root committing to the set of eligible members
+//     * yesVotes / noVotes — the running tallies
+//     * nullifiers     — the set of "used" nullifier hashes
 //
 //   PRIVATE (never leaves the voter's machine):
-//     * voterSecretKey()    — the voter's secret identity key (a witness)
+//     * voterSecretKey()       — the voter's secret identity key (a witness)
+//     * merkleSiblings()       — the sibling hashes on their Merkle path (a witness)
+//     * merklePathIndices()    — left/right directions on their Merkle path (a witness)
 //
 //   WHAT A VOTER PROVES WITHOUT REVEALING IT:
-//     * "I am an eligible voter (I know a secret key) and I have not voted
-//        before" — proven by publishing only a one-way nullifier hash of the
-//        secret key. The tally moves, but the ledger never learns *who* voted,
-//        and two votes by the same key are rejected because the nullifier
-//        would already be present in the public set.
+//     * "I am one of the eligible members committed to by `eligibleRoot`, and I
+//        have not voted on this proposal before" — proven by (a) recomputing
+//        the Merkle root from a private path and checking it against the
+//        public root, without revealing *which* leaf/member it is, and (b)
+//        publishing only a one-way nullifier hash bound to both the secret key
+//        and this proposal. Two votes from the same member on the same
+//        proposal are rejected; the same member voting on a *different*
+//        proposal contract produces an unlinkable nullifier.
 //
-// SCOPE OF PRIVACY: VeilVote hides voter *identity*. The direction of each
-// individual ballot (yes vs no) is inherently public — an observer sees which
-// tally moves — so `castVote` discloses that boolean on purpose. Hiding the
-// per-ballot direction would require a committed/homomorphic tally, which is
-// out of scope here.
+// ELIGIBILITY / SYBIL RESISTANCE: membership is fixed at deploy time as a
+// Merkle root over member leaf-commitments (`leaf = hash(memberSecret)`),
+// built off-chain from the DAO's member list. A secret key that has no path to
+// `eligibleRoot` is rejected — an attacker cannot mint new voters.
 //
-// The two `disclose(...)` calls below are the deliberate, auditable points
-// where private values become public: (1) the nullifier hash, and (2) the vote
-// direction. The secret key itself is never disclosed.
+// SCOPE OF PRIVACY: VeilVote hides voter *identity* and *membership position*.
+// The direction of each individual ballot (yes vs no) is inherently public —
+// an observer sees which tally moves — so `castVote` discloses that boolean
+// on purpose. Hiding interim results (not just per-ballot identity) would
+// require encrypted ballots opened by a trustee at close, which is out of
+// scope for this contract.
+//
+// The three `disclose(...)` calls below are the deliberate, auditable points
+// where private values become public: (1) the recomputed Merkle root, used
+// only to compare against the public root, (2) the nullifier hash, and (3)
+// the vote direction. The secret key and Merkle path are never disclosed.
 // =============================================================================
 
 pragma language_version 0.23;
 
 import CompactStandardLibrary;
 
+// Depth of the eligibility Merkle tree is fixed at 4 (2^4 = 16 members) below,
+// via the `Vector<4, ...>` witness/argument types. Small on purpose — this is
+// sized for a demo DAO, not production membership scale.
+
 // ---- Public ledger state ----------------------------------------------------
+export ledger proposalId: Bytes<32>;
+export ledger eligibleRoot: Bytes<32>;
 export ledger yesVotes: Counter;
 export ledger noVotes: Counter;
 export ledger nullifiers: Set<Bytes<32>>;
 
-// ---- Private witness --------------------------------------------------------
-// Supplied locally by each voter; the compiler forbids it from reaching public
-// state unless explicitly wrapped in disclose().
-witness voterSecretKey(): Bytes<32>;
+// Both arguments are public-by-design (the proposal identifier and the
+// eligibility root are meant to be known to everyone), so they're disclosed
+// immediately on construction.
+constructor(initialProposalId: Bytes<32>, initialEligibleRoot: Bytes<32>) {
+  proposalId = disclose(initialProposalId);
+  eligibleRoot = disclose(initialEligibleRoot);
+}
 
-// ---- Pure helper: derive a domain-separated nullifier from a secret key -----
-// persistentHash is a one-way function, so the nullifier reveals nothing about
-// the secret key while remaining stable across contract upgrades.
-export circuit deriveNullifier(sk: Bytes<32>): Bytes<32> {
-  return persistentHash<Vector<2, Bytes<32>>>(
-    [pad(32, "veilvote:nullifier:"), sk]
+// ---- Private witnesses -------------------------------------------------------
+// Supplied locally by each voter; the compiler forbids them from reaching
+// public state unless explicitly wrapped in disclose().
+witness voterSecretKey(): Bytes<32>;
+witness merkleSiblings(): Vector<4, Bytes<32>>;
+witness merklePathIndices(): Vector<4, Boolean>;
+
+// ---- Pure helpers: eligibility Merkle path ----------------------------------
+
+// Domain-separated leaf commitment for a member's secret key.
+export circuit leafHash(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "veilvote:leaf:"), sk]);
+}
+
+// One step up the tree: combine `current` with its sibling in the correct
+// left/right order, domain-separated so leaf and node hashes never collide.
+export circuit hashLevel(isRight: Boolean, current: Bytes<32>, sibling: Bytes<32>): Bytes<32> {
+  if (isRight) {
+    return persistentHash<Vector<3, Bytes<32>>>([pad(32, "veilvote:node:"), sibling, current]);
+  } else {
+    return persistentHash<Vector<3, Bytes<32>>>([pad(32, "veilvote:node:"), current, sibling]);
+  }
+}
+
+// Recompute the Merkle root from a secret key and its private path. This is
+// pure: it only touches its arguments, never the ledger or a witness call.
+export circuit computeRoot(
+  sk: Bytes<32>,
+  siblings: Vector<4, Bytes<32>>,
+  indices: Vector<4, Boolean>
+): Bytes<32> {
+  const h0 = hashLevel(indices[0], leafHash(sk), siblings[0]);
+  const h1 = hashLevel(indices[1], h0, siblings[1]);
+  const h2 = hashLevel(indices[2], h1, siblings[2]);
+  const h3 = hashLevel(indices[3], h2, siblings[3]);
+  return h3;
+}
+
+// Domain- and proposal-separated nullifier, so the same member voting on a
+// different proposal (a different deployed contract) yields an unlinkable
+// nullifier, and voting twice on this proposal reuses the same one.
+export circuit deriveNullifier(propId: Bytes<32>, sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>(
+    [pad(32, "veilvote:nullifier:"), propId, sk]
   );
 }
 
-// ---- Transition: cast a single anonymous vote -------------------------------
+// ---- Transition: cast a single anonymous, eligibility-checked vote ---------
 export circuit castVote(voteYes: Boolean): [] {
-  // Compute the nullifier from the PRIVATE key, then deliberately disclose only
-  // the hash so it can be checked against and stored in the PUBLIC set.
-  const n = disclose(deriveNullifier(voterSecretKey()));
+  const sk = voterSecretKey();
 
-  // Anti double-vote: reject if this nullifier was already used.
-  assert(!nullifiers.member(n), "This voter has already cast a vote");
+  // Eligibility: recompute the root from the PRIVATE key + path and compare it
+  // to the PUBLIC root. Comparing witness-derived values doesn't require
+  // disclose() — only writing them to the ledger or returning them does.
+  const computedRoot = computeRoot(sk, merkleSiblings(), merklePathIndices());
+  assert(computedRoot == eligibleRoot, "Not an eligible member of this vote");
+
+  // Anti double-vote: derive the nullifier from the PRIVATE key bound to this
+  // PUBLIC proposal, then deliberately disclose only the hash so it can be
+  // checked against and stored in the PUBLIC set.
+  const n = disclose(deriveNullifier(proposalId, sk));
+  assert(!nullifiers.member(n), "This member has already voted on this proposal");
   nullifiers.insert(n);
 
   // The per-ballot direction is public by design, so disclose it deliberately

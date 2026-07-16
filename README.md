@@ -1,6 +1,6 @@
 # VeilVote
 
-> A privacy-preserving yes/no voting contract on Midnight: anonymous ballots with cryptographic double-vote protection.
+> A privacy-preserving DAO voting contract on Midnight: anonymous, eligibility-checked ballots with cryptographic double-vote protection.
 
 ## Contract Address
 
@@ -15,29 +15,50 @@
 
 ## What This Does
 
-VeilVote runs a simple **yes/no poll**. Anyone who holds a secret voter key can cast
-exactly one ballot. The public ledger keeps the running `yes`/`no` tallies and a set of
-"used" nullifiers. When you vote, the contract publishes only a **one-way hash** of your
-secret key (a *nullifier*) — never the key itself. That hash lets the contract prove you
-haven't voted before **without learning who you are**. A second vote from the same key is
-rejected because its nullifier is already in the public set.
+VeilVote runs a **DAO yes/no proposal vote** with a fixed, known set of eligible members.
+Each deployed contract instance is one proposal: it's constructed with a `proposalId` and
+an `eligibleRoot` — a Merkle root committing to every member's secret-key commitment,
+built off-chain from the DAO's member list. To vote, a member proves in zero-knowledge
+that their secret key belongs to that tree, without revealing *which* member they are, and
+publishes only a one-way **nullifier** (bound to both their key and this proposal) so a
+second vote from the same member on the same proposal is rejected. A key with no path
+into the tree — i.e. not a real member — is rejected outright: **membership can't be
+forged, and non-members can't vote.**
 
 ## Privacy Model
 
 - **PUBLIC (on-chain, visible to anyone):**
+  - `proposalId` — which proposal this contract instance is for.
+  - `eligibleRoot` — the Merkle root committing to the eligible member set.
   - `yesVotes` / `noVotes` — the running tallies (`Counter`).
   - `nullifiers` — the set of used nullifier hashes (`Set<Bytes<32>>`).
   - The **direction** of each individual ballot (which tally moved) is inherently public.
-- **PRIVATE (a witness — never leaves the voter's machine, never on-chain):**
+- **PRIVATE (witnesses — never leave the voter's machine, never on-chain):**
   - `voterSecretKey()` — the voter's secret identity key.
+  - `merkleSiblings()` / `merklePathIndices()` — the private Merkle path proving that key
+    is a leaf in `eligibleRoot`, without revealing its position.
 - **What the voter PROVES without revealing it:**
-  - "I know an eligible voter's secret key **and** I have not voted before" — proven by
-    publishing only `persistentHash("veilvote:nullifier:" ‖ secretKey)`. Voter **identity**
-    stays hidden; double-votes are impossible because the nullifier is deterministic.
+  - "I am one of the members committed to by `eligibleRoot`, **and** I have not voted on
+    this proposal before" — proven by (a) recomputing the Merkle root from a private path
+    and checking it equals the public root, and (b) publishing only
+    `persistentHash("veilvote:nullifier:" ‖ proposalId ‖ secretKey)`. Voter **identity and
+    membership position** stay hidden; a member voting on a *different* proposal produces
+    an unlinkable nullifier.
 
-The two deliberate `disclose(...)` calls in [`contracts/counter.compact`](contracts/counter.compact)
-are the only points where private data becomes public: the nullifier hash and the vote
-direction. Everything else is private by default, enforced by the Compact compiler.
+**Eligibility / Sybil resistance:** membership is fixed at deploy time — an attacker cannot
+mint new eligible voters, because their key has no path to the published root.
+
+**Scope of privacy:** VeilVote hides voter identity and membership position. The direction
+of each individual ballot is inherently public — an observer sees which tally moves — so
+`castVote` discloses that boolean on purpose. Hiding *interim results* (not just per-ballot
+identity) would require encrypted ballots opened by a trustee at close; that's a natural
+next step, not part of this contract.
+
+The three deliberate `disclose(...)` calls in [`contracts/counter.compact`](contracts/counter.compact)
+are the only points where private data becomes public: the recomputed Merkle root (used
+only for comparison), the nullifier hash, and the vote direction. The secret key and
+Merkle path are never disclosed — everything else is private by default, enforced by the
+Compact compiler.
 
 ## Tech Stack
 
@@ -82,10 +103,13 @@ npm test             # vitest run — exercises the compiled circuits via the si
 npm run test:compile
 ```
 
-The suite ([`tests/counter.test.ts`](tests/counter.test.ts)) covers circuit logic
-(tallies move correctly), state transitions (multiple voters + double-vote rejection),
-and privacy (the secret key never reaches public state; distinct keys yield distinct
-nullifiers).
+The suite ([`tests/counter.test.ts`](tests/counter.test.ts), 6 tests) covers: circuit logic
+(tallies move correctly), **eligibility / Sybil resistance** (a non-member key is rejected
+even with a forged path), state transitions (multiple eligible members + double-vote
+rejection), **cross-proposal unlinkability** (the same member's nullifier differs across
+two proposals), and privacy (the secret key and Merkle path never reach public state).
+[`tests/merkle.ts`](tests/merkle.ts) builds the eligibility tree off-chain using the
+contract's own compiled `pureCircuits`, so tests hash exactly the way the circuit does.
 
 ## Deploying to a network
 
@@ -112,7 +136,8 @@ veilvote/
 ├── contracts/counter.compact   # the VeilVote Compact contract
 ├── managed/                    # generated by `npm run compact` (circuits + keys)
 ├── tests/                      # simulator + Vitest suite
-│   ├── witnesses.ts            # private state + voterSecretKey witness
+│   ├── witnesses.ts            # private state + witness implementations
+│   ├── merkle.ts                # off-chain eligibility Merkle tree builder
 │   ├── veilvote-simulator.ts   # in-memory test harness
 │   └── counter.test.ts         # the tests
 ├── src/                        # frontend (Level 2)
