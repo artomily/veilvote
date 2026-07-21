@@ -10,27 +10,24 @@ _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" b
 
 | Network  | Address                          |
 |----------|----------------------------------|
-| Preprod  | _[PASTE ADDRESS AFTER DEPLOY]_   |
-| Preview  | _[PASTE ADDRESS AFTER DEPLOY, IF USED INSTEAD]_ |
+| Preview  | `6adf55bad5c85bcd9531d885c2f8f173f5314ec7fb93667d613955d8911c4eb3` |
+| Preprod  | _[not yet — see note below]_    |
 
-> **Not yet deployed — blocked by a confirmed upstream Midnight/Preprod issue, not
-> incomplete work.** Everything that doesn't require a live network is done and verified:
-> the contract **compiles**, **all 6 tests pass**, and the frontend **builds with no
-> errors** (`npm run build` in `frontend/`, confirmed against the compiled contract).
+> **Deployed on Preview** via the headless CLI ([`scripts/deploy-cli.ts`](scripts/deploy-cli.ts),
+> `npm run deploy:preview`). The contract **compiles**, **all 6 tests pass**, and the
+> frontend **builds with no errors** (confirmed against the compiled contract).
 >
-> Deployment itself has been attempted repeatedly via both the browser wallet (Lace/1AM)
-> and a [headless CLI path](#deploying-without-the-browser-wallet) built specifically to
-> rule out browser-extension flakiness. Both hit the same root cause: wallet sync against
-> Preprod never completes. Concretely, under `scripts/deploy-cli.ts`'s per-sub-wallet
-> progress logging, the `unshielded` sync throws an internal `Wallet.Sync` error (from
-> `@midnight-ntwrk/wallet-sdk-unshielded-wallet`) partway through, after which sync either
-> stalls permanently (Node 22) or the retry loop grows memory unbounded until the process
-> OOMs (Node 24) — reproduced independently on two Node majors. This matches a broader,
-> still-open pattern of Preprod wallet-sync issues reported on the [Midnight
-> forum](https://forum.midnight.network/t/wallet-syncing-50-for-3-days-now/742).
->
-> Once Preprod stabilizes (or a fix lands) and a deploy succeeds — via either path — paste
-> the resulting contract address here.
+> **Preprod specifically remains blocked by a confirmed upstream Midnight issue**, not
+> incomplete work on this repo's part: wallet sync against Preprod throws an internal
+> `Wallet.Sync` error (from `@midnight-ntwrk/wallet-sdk-unshielded-wallet`) partway through,
+> after which it either stalls permanently (Node 22) or the retry loop grows memory
+> unbounded until the process OOMs (Node 24) — reproduced independently on two Node majors,
+> and via both the browser wallet (Lace/1AM) and the headless CLI built specifically to
+> rule out browser-extension flakiness. This matches a broader, still-open pattern of
+> Preprod wallet-sync issues reported on the [Midnight
+> forum](https://forum.midnight.network/t/wallet-syncing-50-for-3-days-now/742). Switching
+> to Preview (a separate indexer/node/faucet) sidestepped it entirely — Preview's wallet
+> sync completed cleanly on the first real attempt.
 
 ### Deploying without the browser wallet
 
@@ -91,6 +88,36 @@ forged, and non-members can't vote.**
     `persistentHash("veilvote:nullifier:" ‖ proposalId ‖ secretKey)`. Voter **identity and
     membership position** stay hidden; a member voting on a *different* proposal produces
     an unlinkable nullifier.
+
+```mermaid
+flowchart LR
+    subgraph Private["Voter's machine — private, never on-chain"]
+        SK["voterSecretKey"]
+        MS["merkleSiblings"]
+        MI["merklePathIndices"]
+        VD["vote: yes / no"]
+    end
+
+    subgraph Proof["castVote circuit — zero-knowledge proof"]
+        RC["recompute Merkle root"]
+        NH["nullifier =<br/>hash(proposalId, secretKey)"]
+    end
+
+    subgraph Public["On-chain ledger state — public"]
+        ER["eligibleRoot"]
+        NS["nullifiers set"]
+        TL["yesVotes / noVotes"]
+    end
+
+    SK --> RC
+    MS --> RC
+    MI --> RC
+    SK --> NH
+
+    RC -- "must equal<br/>(root value itself never disclosed)" --> ER
+    NH -- "disclosed, rejected if already present" --> NS
+    VD -- "disclosed" --> TL
+```
 
 **Eligibility / Sybil resistance:** membership is fixed at deploy time — an attacker cannot
 mint new eligible voters, because their key has no path to the published root.
