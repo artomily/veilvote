@@ -20,8 +20,33 @@ _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" b
 > (`npm run build` in `frontend/`, confirmed against the compiled contract).
 >
 > Once you deploy (via the frontend's own "Deploy a new proposal" button, wallet
-> connected), paste the resulting contract address here — this field is mandatory before
-> submitting.
+> connected, **or** the headless CLI below), paste the resulting contract address here —
+> this field is mandatory before submitting.
+
+### Deploying without the browser wallet
+
+The browser wallet extension (Lace/1AM) can get stuck at "syncing..." indefinitely on an
+idle Preprod chain — a known, still-unresolved issue in the wallet SDK, not something
+specific to this app (see the Midnight forum thread ["Wallet syncing 50% for 3 days
+now"](https://forum.midnight.network/t/wallet-syncing-50-for-3-days-now/742)). If you hit
+that, `scripts/deploy-cli.ts` deploys headlessly from a seed phrase instead, the same way
+Midnight's own [example-counter](https://github.com/midnightntwrk/example-counter) CLI
+does — no browser extension involved.
+
+```bash
+# needs a local proof server (see below), same as the browser flow
+docker run -p 6300:6300 midnightnetwork/proof-server
+
+MIDNIGHT_PREPROD_SEED=<64 hex chars> npm run deploy:preprod
+# omit the seed to generate a fresh one — it's printed once, save it
+```
+
+This still needs a funded Preprod wallet (fund the printed address from the
+[faucet](https://midnight-tmnight-preprod.nethermind.dev/), same two-step tNight → tDUST
+process as [Prerequisites](#prerequisites)) and it uses the *same* underlying sync
+mechanism as the browser wallet, so it isn't a guaranteed fix for Preprod infra being
+degraded — but it fails with a clear timeout error after a few minutes instead of hanging
+the terminal silently, and gives you real log output instead of an opaque UI spinner.
 
 ## What This Does
 
@@ -151,6 +176,7 @@ npm test             # vitest run — exercises the compiled circuits via the si
 # or, compile first then test:
 npm run test:compile
 
+npm run typecheck                  # type-checks tests/ and scripts/
 cd frontend && npm run typecheck   # frontend type-checks against the compiled contract
 ```
 
@@ -197,6 +223,7 @@ veilvote/
 │   ├── merkle.ts                # off-chain eligibility Merkle tree builder
 │   ├── veilvote-simulator.ts   # in-memory test harness
 │   └── counter.test.ts         # the tests
+├── scripts/deploy-cli.ts       # headless Preprod deploy (bypasses the browser wallet)
 ├── frontend/                   # React + Vite DApp UI (Level 2)
 │   ├── src/
 │   │   ├── components/
