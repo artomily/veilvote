@@ -17,6 +17,7 @@
 // Omit the seed to generate a fresh one — it's printed once so you can save
 // it (and the funded address that comes with it) for next time.
 import path from "node:path";
+import fs from "node:fs";
 import { WebSocket } from "ws";
 import * as Rx from "rxjs";
 import * as ledger from "@midnight-ntwrk/ledger-v8";
@@ -57,6 +58,27 @@ globalThis.WebSocket = WebSocket;
 
 setNetworkId("preprod");
 
+const envPath = path.resolve(import.meta.dirname, "..", ".env");
+
+/**
+ * Load MIDNIGHT_PREPROD_SEED from .env if present and not already set. Every
+ * run without this would mint a brand-new (unfunded) wallet, orphaning
+ * whatever address you funded last time — this makes reuse the default
+ * instead of something you have to remember to do.
+ */
+function loadDotEnvSeed(): void {
+  if (process.env.MIDNIGHT_PREPROD_SEED || !fs.existsSync(envPath)) return;
+  const match = fs.readFileSync(envPath, "utf8").match(/^MIDNIGHT_PREPROD_SEED=(.+)$/m);
+  if (match) process.env.MIDNIGHT_PREPROD_SEED = match[1].trim();
+}
+
+/** Persist a freshly generated seed to .env so the next run reuses this same (soon-to-be-funded) wallet. */
+function saveSeedToDotEnv(seed: string): void {
+  const line = `MIDNIGHT_PREPROD_SEED=${seed}\n`;
+  fs.appendFileSync(envPath, line);
+  console.log(`  (saved to ${envPath} — future runs will reuse this wallet automatically)`);
+}
+
 const CONFIG = {
   indexer: "https://indexer.preprod.midnight.network/api/v3/graphql",
   indexerWS: "wss://indexer.preprod.midnight.network/api/v3/graphql/ws",
@@ -64,7 +86,15 @@ const CONFIG = {
   proofServer: process.env.PROOF_SERVER_URL ?? "http://127.0.0.1:6300",
 };
 
-const SYNC_TIMEOUT_MS = 3 * 60_000;
+// A fresh wallet has to scan chain history from scratch every run (this
+// script has no persisted sync cache across invocations), which can
+// legitimately take much longer than a warm browser wallet's resumed sync —
+// the first real run showed applied-index climbing into the hundreds of
+// thousands well past 3 minutes. 20 min gives that a real chance instead of
+// aborting mid-catch-up; the per-wallet progress log will show whether it's
+// still climbing (slow but fine) or genuinely stalled (isConnected=false, or
+// appliedIndex flat across two log lines).
+const SYNC_TIMEOUT_MS = 20 * 60_000;
 const FUNDING_TIMEOUT_MS = 10 * 60_000;
 const PRIVATE_STATE_ID = "veilVotePrivateState";
 const managedDir = path.resolve(import.meta.dirname, "..", "managed");
@@ -130,28 +160,54 @@ async function withStatus<T>(message: string, fn: () => Promise<T>): Promise<T> 
 }
 
 /**
+ * One line per sub-wallet: connection state and how far behind the chain
+ * tip it is. Printed periodically while waiting so a stuck sync shows
+ * *which* sub-wallet is stuck and why (disconnected vs. just lagging),
+ * instead of one opaque isSynced=false.
+ */
+function logSyncProgress(state: any): void {
+  const line = (name: string, progress: any) => {
+    const hasIndices = typeof progress.appliedIndex === "bigint" && typeof progress.highestIndex === "bigint";
+    const indices = hasIndices
+      ? ` applied=${progress.appliedIndex}/${progress.highestIndex} (gap=${progress.highestIndex - progress.appliedIndex})`
+      : "";
+    return `${name}: connected=${progress.isConnected}${indices} complete=${progress.isStrictlyComplete()}`;
+  };
+  console.log(
+    `\n  ${line("shielded", state.shielded.progress)}\n  ${line("unshielded", state.unshielded.progress)}\n  ${line("dust", state.dust.progress)}`,
+  );
+}
+
+/**
  * Wait for the wallet to report fully synced, or fail loudly after
  * SYNC_TIMEOUT_MS instead of hanging forever. On an idle Preprod chain the
  * dust sub-wallet can wait indefinitely for a chain tip that never arrives —
  * this timeout is the one thing headless mode buys you over the browser
- * extension's silent spinner.
+ * extension's silent spinner. Progress is logged periodically so a timeout
+ * says *which* sub-wallet was stuck, not just "not synced".
  */
 function waitForSync(wallet: WalletFacade) {
+  let lastState: any = null;
   return Rx.firstValueFrom(
     wallet.state().pipe(
       Rx.throttleTime(5_000),
+      Rx.tap((state) => {
+        lastState = state;
+        logSyncProgress(state);
+      }),
       Rx.filter((state) => state.isSynced),
       Rx.timeout({
         each: SYNC_TIMEOUT_MS,
         with: () =>
-          Rx.throwError(
-            () =>
-              new Error(
-                `Wallet did not report synced within ${SYNC_TIMEOUT_MS / 1000}s. This usually means Preprod ` +
-                  "infra (indexer/node) is degraded right now, not a problem with this script — see the " +
-                  "Midnight Discord #dev-chat or forum.midnight.network for current status.",
-              ),
-          ),
+          Rx.throwError(() => {
+            if (lastState) logSyncProgress(lastState);
+            return new Error(
+              `Wallet did not report synced within ${SYNC_TIMEOUT_MS / 1000}s (see per-wallet progress above). ` +
+                "isConnected=false or a large gap points at Preprod infra (indexer/node) being degraded right " +
+                "now, not a problem with this script — see the Midnight Discord #dev-chat or " +
+                "forum.midnight.network for current status.",
+            );
+          }),
       }),
     ),
   );
@@ -365,18 +421,19 @@ async function createWalletAndMidnightProvider(ctx: WalletContext) {
 }
 
 async function main() {
+  loadDotEnvSeed();
   const seedArg = process.env.MIDNIGHT_PREPROD_SEED;
   const seed = seedArg ?? toHex(Buffer.from(generateRandomSeed()));
   if (!seedArg) {
     const DIV = "─".repeat(64);
     console.log(`
 ${DIV}
-  New Wallet Seed — save this in .env as MIDNIGHT_PREPROD_SEED
-  before running this script again, it will NOT be shown again
+  New Wallet Seed
 ${DIV}
   ${seed}
 ${DIV}
 `);
+    saveSeedToDotEnv(seed);
   }
 
   const ctx = await buildWalletAndWaitForFunds(seed);

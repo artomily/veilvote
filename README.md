@@ -12,16 +12,24 @@ _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" b
 |----------|----------------------------------|
 | Preprod  | _[PASTE ADDRESS AFTER DEPLOY]_   |
 
-> **Not yet deployed.** Deploying to Preprod needs a funded wallet and — depending on
-> your wallet's proving mode — a local proof server (see [Prerequisites](#prerequisites)
-> and [Proving: no Docker required (usually)](#proving-no-docker-required-usually)).
-> Everything that doesn't require a live network is done and verified: the contract
-> **compiles**, **all 6 tests pass**, and the frontend **builds with no errors**
-> (`npm run build` in `frontend/`, confirmed against the compiled contract).
+> **Not yet deployed — blocked by a confirmed upstream Midnight/Preprod issue, not
+> incomplete work.** Everything that doesn't require a live network is done and verified:
+> the contract **compiles**, **all 6 tests pass**, and the frontend **builds with no
+> errors** (`npm run build` in `frontend/`, confirmed against the compiled contract).
 >
-> Once you deploy (via the frontend's own "Deploy a new proposal" button, wallet
-> connected, **or** the headless CLI below), paste the resulting contract address here —
-> this field is mandatory before submitting.
+> Deployment itself has been attempted repeatedly via both the browser wallet (Lace/1AM)
+> and a [headless CLI path](#deploying-without-the-browser-wallet) built specifically to
+> rule out browser-extension flakiness. Both hit the same root cause: wallet sync against
+> Preprod never completes. Concretely, under `scripts/deploy-cli.ts`'s per-sub-wallet
+> progress logging, the `unshielded` sync throws an internal `Wallet.Sync` error (from
+> `@midnight-ntwrk/wallet-sdk-unshielded-wallet`) partway through, after which sync either
+> stalls permanently (Node 22) or the retry loop grows memory unbounded until the process
+> OOMs (Node 24) — reproduced independently on two Node majors. This matches a broader,
+> still-open pattern of Preprod wallet-sync issues reported on the [Midnight
+> forum](https://forum.midnight.network/t/wallet-syncing-50-for-3-days-now/742).
+>
+> Once Preprod stabilizes (or a fix lands) and a deploy succeeds — via either path — paste
+> the resulting contract address here.
 
 ### Deploying without the browser wallet
 
