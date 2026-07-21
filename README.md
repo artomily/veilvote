@@ -11,6 +11,7 @@ _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" b
 | Network  | Address                          |
 |----------|----------------------------------|
 | Preprod  | _[PASTE ADDRESS AFTER DEPLOY]_   |
+| Preview  | _[PASTE ADDRESS AFTER DEPLOY, IF USED INSTEAD]_ |
 
 > **Not yet deployed — blocked by a confirmed upstream Midnight/Preprod issue, not
 > incomplete work.** Everything that doesn't require a live network is done and verified:
@@ -45,16 +46,19 @@ does — no browser extension involved.
 # needs a local proof server (see below), same as the browser flow
 docker run -p 6300:6300 midnightnetwork/proof-server
 
-MIDNIGHT_PREPROD_SEED=<64 hex chars> npm run deploy:preprod
-# omit the seed to generate a fresh one — it's printed once, save it
+npm run deploy:preprod   # or: npm run deploy:preview
+# a seed is auto-generated + saved to .env on first run per network
+# (MIDNIGHT_PREPROD_SEED / MIDNIGHT_PREVIEW_SEED), then reused automatically
 ```
 
-This still needs a funded Preprod wallet (fund the printed address from the
-[faucet](https://midnight-tmnight-preprod.nethermind.dev/), same two-step tNight → tDUST
-process as [Prerequisites](#prerequisites)) and it uses the *same* underlying sync
-mechanism as the browser wallet, so it isn't a guaranteed fix for Preprod infra being
-degraded — but it fails with a clear timeout error after a few minutes instead of hanging
-the terminal silently, and gives you real log output instead of an opaque UI spinner.
+This still needs a funded wallet on whichever network you pick (Preprod:
+[faucet](https://midnight-tmnight-preprod.nethermind.dev/), two-step tNight → tDUST as in
+[Prerequisites](#prerequisites); Preview: [faucet](https://midnight.network/test-faucet))
+and it uses the *same* underlying sync mechanism as the browser wallet, so it isn't a
+guaranteed fix for either network's infra being degraded — but it fails with a clear
+timeout error instead of hanging the terminal silently, logs each sub-wallet's own
+sync/connection state so a stuck run says *which* wallet and why, and lets you fall back to
+Preview if Preprod specifically is unhealthy.
 
 ## What This Does
 

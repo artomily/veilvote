@@ -13,9 +13,10 @@
 // hanging the terminal silently.
 //
 // Usage:
-//   MIDNIGHT_PREPROD_SEED=<64 hex chars> npm run deploy:preprod
-// Omit the seed to generate a fresh one — it's printed once so you can save
-// it (and the funded address that comes with it) for next time.
+//   MIDNIGHT_NETWORK=preprod|preview npm run deploy:preprod   (defaults to preprod)
+// A seed is auto-generated and saved to .env on first run per network (as
+// MIDNIGHT_PREPROD_SEED or MIDNIGHT_PREVIEW_SEED), then reused automatically
+// on every later run — so a stuck sync/retry never orphans a funded wallet.
 import path from "node:path";
 import fs from "node:fs";
 import { WebSocket } from "ws";
@@ -56,33 +57,54 @@ import { InMemoryPrivateStateProvider } from "../frontend/src/midnight/in-memory
 // @ts-expect-error: assigning the Node 'ws' package over the WHATWG global
 globalThis.WebSocket = WebSocket;
 
-setNetworkId("preprod");
+type NetworkName = "preprod" | "preview";
+const NETWORK: NetworkName = process.env.MIDNIGHT_NETWORK === "preview" ? "preview" : "preprod";
+
+const NETWORK_CONFIG: Record<
+  NetworkName,
+  { indexer: string; indexerWS: string; node: string; faucetUrl: string; seedEnvVar: string }
+> = {
+  preprod: {
+    indexer: "https://indexer.preprod.midnight.network/api/v3/graphql",
+    indexerWS: "wss://indexer.preprod.midnight.network/api/v3/graphql/ws",
+    node: "https://rpc.preprod.midnight.network",
+    faucetUrl: "https://midnight-tmnight-preprod.nethermind.dev/",
+    seedEnvVar: "MIDNIGHT_PREPROD_SEED",
+  },
+  preview: {
+    indexer: "https://indexer.preview.midnight.network/api/v3/graphql",
+    indexerWS: "wss://indexer.preview.midnight.network/api/v3/graphql/ws",
+    node: "https://rpc.preview.midnight.network",
+    faucetUrl: "https://midnight.network/test-faucet",
+    seedEnvVar: "MIDNIGHT_PREVIEW_SEED",
+  },
+};
+
+setNetworkId(NETWORK);
 
 const envPath = path.resolve(import.meta.dirname, "..", ".env");
+const SEED_ENV_VAR = NETWORK_CONFIG[NETWORK].seedEnvVar;
 
 /**
- * Load MIDNIGHT_PREPROD_SEED from .env if present and not already set. Every
+ * Load the per-network seed from .env if present and not already set. Every
  * run without this would mint a brand-new (unfunded) wallet, orphaning
  * whatever address you funded last time — this makes reuse the default
  * instead of something you have to remember to do.
  */
 function loadDotEnvSeed(): void {
-  if (process.env.MIDNIGHT_PREPROD_SEED || !fs.existsSync(envPath)) return;
-  const match = fs.readFileSync(envPath, "utf8").match(/^MIDNIGHT_PREPROD_SEED=(.+)$/m);
-  if (match) process.env.MIDNIGHT_PREPROD_SEED = match[1].trim();
+  if (process.env[SEED_ENV_VAR] || !fs.existsSync(envPath)) return;
+  const match = fs.readFileSync(envPath, "utf8").match(new RegExp(`^${SEED_ENV_VAR}=(.+)$`, "m"));
+  if (match) process.env[SEED_ENV_VAR] = match[1].trim();
 }
 
 /** Persist a freshly generated seed to .env so the next run reuses this same (soon-to-be-funded) wallet. */
 function saveSeedToDotEnv(seed: string): void {
-  const line = `MIDNIGHT_PREPROD_SEED=${seed}\n`;
-  fs.appendFileSync(envPath, line);
-  console.log(`  (saved to ${envPath} — future runs will reuse this wallet automatically)`);
+  fs.appendFileSync(envPath, `${SEED_ENV_VAR}=${seed}\n`);
+  console.log(`  (saved to ${envPath} as ${SEED_ENV_VAR} — future runs reuse this wallet automatically)`);
 }
 
 const CONFIG = {
-  indexer: "https://indexer.preprod.midnight.network/api/v3/graphql",
-  indexerWS: "wss://indexer.preprod.midnight.network/api/v3/graphql/ws",
-  node: "https://rpc.preprod.midnight.network",
+  ...NETWORK_CONFIG[NETWORK],
   proofServer: process.env.PROOF_SERVER_URL ?? "http://127.0.0.1:6300",
 };
 
@@ -203,8 +225,8 @@ function waitForSync(wallet: WalletFacade) {
             if (lastState) logSyncProgress(lastState);
             return new Error(
               `Wallet did not report synced within ${SYNC_TIMEOUT_MS / 1000}s (see per-wallet progress above). ` +
-                "isConnected=false or a large gap points at Preprod infra (indexer/node) being degraded right " +
-                "now, not a problem with this script — see the Midnight Discord #dev-chat or " +
+                `isConnected=false or a large gap points at ${NETWORK} infra (indexer/node) being degraded ` +
+                "right now, not a problem with this script — see the Midnight Discord #dev-chat or " +
                 "forum.midnight.network for current status.",
             );
           }),
@@ -227,8 +249,8 @@ function waitForFunds(wallet: WalletFacade): Promise<bigint> {
             () =>
               new Error(
                 `No tNight arrived within ${FUNDING_TIMEOUT_MS / 1000}s. Fund the address printed above from ` +
-                  "the Preprod faucet (https://midnight-tmnight-preprod.nethermind.dev/), then re-run this " +
-                  "script with the same MIDNIGHT_PREPROD_SEED.",
+                  `the ${NETWORK} faucet (${CONFIG.faucetUrl}), then re-run this script with the same ` +
+                  `${SEED_ENV_VAR}.`,
               ),
           ),
       }),
@@ -237,21 +259,21 @@ function waitForFunds(wallet: WalletFacade): Promise<bigint> {
 }
 
 const buildShieldedConfig = () => ({
-  networkId: "preprod",
+  networkId: NETWORK,
   indexerClientConnection: { indexerHttpUrl: CONFIG.indexer, indexerWsUrl: CONFIG.indexerWS },
   provingServerUrl: new URL(CONFIG.proofServer),
   relayURL: new URL(CONFIG.node.replace(/^http/, "ws")),
 });
 
 const buildUnshieldedConfig = () => ({
-  networkId: "preprod",
+  networkId: NETWORK,
   indexerClientConnection: { indexerHttpUrl: CONFIG.indexer, indexerWsUrl: CONFIG.indexerWS },
   // A one-shot deploy script doesn't need persisted tx history.
   txHistoryStorage: new NoOpTransactionHistoryStorage(),
 });
 
 const buildDustConfig = () => ({
-  networkId: "preprod",
+  networkId: NETWORK,
   costParameters: { additionalFeeOverhead: 300_000_000_000_000n, feeBlocksMargin: 5 },
   indexerClientConnection: { indexerHttpUrl: CONFIG.indexer, indexerWsUrl: CONFIG.indexerWS },
   provingServerUrl: new URL(CONFIG.proofServer),
@@ -275,13 +297,13 @@ function printWalletSummary(state: any, unshieldedKeystore: UnshieldedKeystore) 
   const coinPubKey = ShieldedCoinPublicKey.fromHexString(state.shielded.coinPublicKey.toHexString());
   const encPubKey = ShieldedEncryptionPublicKey.fromHexString(state.shielded.encryptionPublicKey.toHexString());
   const shieldedAddress = MidnightBech32m.encode(
-    "preprod",
+    NETWORK,
     new ShieldedAddress(coinPubKey, encPubKey),
   ).toString();
   const DIV = "─".repeat(64);
   console.log(`
 ${DIV}
-  Wallet Overview                            Network: preprod
+  Wallet Overview                            Network: ${NETWORK}
 ${DIV}
 
   Shielded (ZSwap)
@@ -292,7 +314,7 @@ ${DIV}
   └─ Balance: ${formatBalance(unshieldedBalance)} tNight
 
   Dust
-  └─ Address: ${MidnightBech32m.encode("preprod", state.dust.address).toString()}
+  └─ Address: ${MidnightBech32m.encode(NETWORK, state.dust.address).toString()}
 ${DIV}`);
 }
 
@@ -350,7 +372,7 @@ async function buildWalletAndWaitForFunds(seed: string): Promise<WalletContext> 
       const keys = deriveKeysFromSeed(seed);
       const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(keys[Roles.Zswap]);
       const dustSecretKey = ledger.DustSecretKey.fromSeed(keys[Roles.Dust]);
-      const unshieldedKeystore = createKeystore(keys[Roles.NightExternal], "preprod" as any);
+      const unshieldedKeystore = createKeystore(keys[Roles.NightExternal], NETWORK as any);
 
       const walletConfig = { ...buildShieldedConfig(), ...buildUnshieldedConfig(), ...buildDustConfig() };
       const wallet = await WalletFacade.init({
@@ -371,8 +393,8 @@ ${DIV}
   Unshielded Address (send tNight here):
   ${unshieldedKeystore.getBech32Address()}
 
-  Fund via the Preprod faucet if you haven't already:
-  https://midnight-tmnight-preprod.nethermind.dev/
+  Fund via the ${NETWORK} faucet if you haven't already:
+  ${CONFIG.faucetUrl}
 ${DIV}
 `);
 
@@ -421,8 +443,9 @@ async function createWalletAndMidnightProvider(ctx: WalletContext) {
 }
 
 async function main() {
+  console.log(`\n  Network: ${NETWORK} (set MIDNIGHT_NETWORK=preprod|preview to change)`);
   loadDotEnvSeed();
-  const seedArg = process.env.MIDNIGHT_PREPROD_SEED;
+  const seedArg = process.env[SEED_ENV_VAR];
   const seed = seedArg ?? toHex(Buffer.from(generateRandomSeed()));
   if (!seedArg) {
     const DIV = "─".repeat(64);
@@ -466,7 +489,7 @@ ${DIV}
   const DIV = "─".repeat(64);
   console.log(`
 ${DIV}
-  Deployed! Contract address (Preprod):
+  Deployed! Contract address (${NETWORK}):
 
   ${address}
 

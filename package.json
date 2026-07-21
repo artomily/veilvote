@@ -8,7 +8,8 @@
     "test": "vitest run",
     "test:compile": "npm run compact && vitest run",
     "typecheck": "tsc --noEmit",
-    "deploy:preprod": "tsx scripts/deploy-cli.ts"
+    "deploy:preprod": "tsx scripts/deploy-cli.ts",
+    "deploy:preview": "MIDNIGHT_NETWORK=preview tsx scripts/deploy-cli.ts"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-js": "2.5.1",
