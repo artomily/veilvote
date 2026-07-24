@@ -9,6 +9,6 @@
     "noEmit": true,
     "resolveJsonModule": true
   },
-  "include": ["scripts/**/*.ts", "tests/**/*.ts"],
+  "include": ["scripts/**/*.ts", "tests/**/*.ts", "shared/**/*.ts"],
   "exclude": ["node_modules", "frontend"]
 }

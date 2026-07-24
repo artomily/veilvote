@@ -98,3 +98,159 @@
   font-size: 0.85rem;
   opacity: 0.8;
 }
+
+.mode-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.mode-toggle__button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.mode-toggle__button--active {
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.demo-flow {
+  margin-top: 1rem;
+}
+
+.demo-flow__intro p {
+  opacity: 0.85;
+}
+
+.demo-flow__controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.demo-flow__reset {
+  opacity: 0.75;
+}
+
+.demo-flow__proposal {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.demo-flow__steps {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.demo-flow__step {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.demo-flow__step--active {
+  border-color: color-mix(in srgb, #3b82f6 50%, transparent);
+  background: color-mix(in srgb, #3b82f6 8%, transparent);
+}
+
+.demo-flow__step--success {
+  border-color: color-mix(in srgb, #22c55e 40%, transparent);
+  background: color-mix(in srgb, #22c55e 6%, transparent);
+}
+
+.demo-flow__step--rejected {
+  border-color: color-mix(in srgb, #ef4444 40%, transparent);
+  background: color-mix(in srgb, #ef4444 6%, transparent);
+}
+
+.demo-flow__step-icon {
+  flex: none;
+  width: 1.5rem;
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.demo-flow__step--active .demo-flow__step-icon {
+  animation: demo-flow-pulse 1s ease-in-out infinite;
+}
+
+@keyframes demo-flow-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.demo-flow__step-title {
+  font-weight: 600;
+  margin: 0;
+}
+
+.demo-flow__step-description {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.demo-flow__step-detail {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  font-family: monospace;
+  opacity: 0.85;
+}
+
+.demo-flow__tally,
+.demo-flow__log {
+  margin-top: 1.75rem;
+}
+
+.demo-flow__tally h3,
+.demo-flow__log h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.demo-flow__log ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-family: monospace;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.demo-flow__log-entry {
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.demo-flow__log-entry--success {
+  color: #16a34a;
+}
+
+.demo-flow__log-entry--error {
+  color: #ef4444;
+}

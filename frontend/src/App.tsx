@@ -1,11 +1,15 @@
 import { useState } from "react";
 import WalletConnect from "./components/WalletConnect.js";
 import CircuitCall from "./components/CircuitCall.js";
+import DemoFlow from "./demo/DemoFlow.js";
 import { useMidnight } from "./hooks/useMidnight.js";
+
+type Mode = "demo" | "live";
 
 export default function App() {
   const m = useMidnight();
   const [joinInput, setJoinInput] = useState("");
+  const [mode, setMode] = useState<Mode>("demo");
 
   const connected = m.walletState === "connected";
   const hasContract = connected && !!m.contractAddress;
@@ -15,16 +19,43 @@ export default function App() {
       <header className="app__header">
         <h1>VeilVote</h1>
         <p>Private, eligibility-checked DAO voting on Midnight.</p>
-        <WalletConnect
-          walletState={m.walletState}
-          address={m.address}
-          error={connected ? null : m.error}
-          onConnect={m.connect}
-          onDisconnect={m.disconnect}
-        />
+        <div className="mode-toggle" role="tablist" aria-label="Demo mode">
+          <button
+            role="tab"
+            aria-selected={mode === "demo"}
+            className={`mode-toggle__button${mode === "demo" ? " mode-toggle__button--active" : ""}`}
+            onClick={() => setMode("demo")}
+          >
+            Offline demo
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === "live"}
+            className={`mode-toggle__button${mode === "live" ? " mode-toggle__button--active" : ""}`}
+            onClick={() => setMode("live")}
+          >
+            Live wallet
+          </button>
+        </div>
+        {mode === "live" && (
+          <WalletConnect
+            walletState={m.walletState}
+            address={m.address}
+            error={connected ? null : m.error}
+            onConnect={m.connect}
+            onDisconnect={m.disconnect}
+          />
+        )}
       </header>
 
-      {connected && (
+      {mode === "demo" && (
+        <section className="app__section">
+          <h2>Orchestrated flow (offline demo)</h2>
+          <DemoFlow />
+        </section>
+      )}
+
+      {mode === "live" && connected && (
         <section className="app__section">
           <h2>Proposal contract</h2>
           {m.contractAddress ? (
@@ -50,7 +81,7 @@ export default function App() {
         </section>
       )}
 
-      {connected && (
+      {mode === "live" && connected && (
         <section className="app__section">
           <h2>Your identity</h2>
           <label>
@@ -70,7 +101,7 @@ export default function App() {
         </section>
       )}
 
-      {connected && hasContract && (
+      {mode === "live" && connected && hasContract && (
         <section className="app__section">
           <h2>Tally</h2>
           {m.ledgerState ? (
@@ -85,7 +116,7 @@ export default function App() {
         </section>
       )}
 
-      {connected && hasContract && (
+      {mode === "live" && connected && hasContract && (
         <section className="app__section">
           <h2>Cast your vote</h2>
           <CircuitCall
@@ -97,7 +128,7 @@ export default function App() {
         </section>
       )}
 
-      {m.error && connected && <p className="app__error">{m.error}</p>}
+      {mode === "live" && m.error && connected && <p className="app__error">{m.error}</p>}
     </main>
   );
 }

@@ -20,6 +20,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ["@midnight-ntwrk/compact-runtime"],
+    // compact-runtime is excluded above, so Vite's scanner never crawls into
+    // it to find this CJS transitive dep; without pre-bundling it here, the
+    // browser gets served the raw CJS file and errors with "does not provide
+    // an export named 'default'" on `import inspect from 'object-inspect'`.
+    include: ["object-inspect"],
     esbuildOptions: {
       target: "esnext",
     },
