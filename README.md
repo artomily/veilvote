@@ -6,6 +6,9 @@
 
 _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" below]_
 
+**Demo video:** [media/veilvote-demo.mp4](media/veilvote-demo.mp4) — a narrated walkthrough of
+the offline demo flow (deploy, three private votes, two rejections).
+
 ## Contract Address
 
 | Network  | Address                          |
