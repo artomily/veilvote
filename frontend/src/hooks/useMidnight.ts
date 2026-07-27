@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConnectedAPI, InitialAPI } from "@midnight-ntwrk/dapp-connector-api";
 import type { ContractAddress } from "@midnight-ntwrk/compact-runtime";
+import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import { findWallet, friendlyError, buildProviders, type VeilVoteProviders } from "../midnight/providers.js";
 import { deployProposal, joinProposal } from "../midnight/deploy.js";
 import { ledger, type Ledger } from "../../../managed/contract/index.js";
@@ -8,6 +9,9 @@ import { demoVoterLabels, demoVoterState, eligibilityRoot } from "../eligibility
 
 const NETWORK_ID = (import.meta.env.VITE_NETWORK_ID as string) ?? "preprod";
 const DEFAULT_CONTRACT = (import.meta.env.VITE_CONTRACT_ADDRESS as string) ?? "";
+
+// Must run before any wallet or contract operation (deploy, join, connect).
+setNetworkId(NETWORK_ID);
 
 export type WalletState = "detecting" | "no-wallet" | "ready" | "connecting" | "connected";
 

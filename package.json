@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "frontend"
+  ],
+  "overrides": {
+    "vite": "7.3.6"
+  },
   "scripts": {
     "compact": "compact compile contracts/counter.compact managed",
     "test": "vitest run",

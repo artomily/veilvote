@@ -18,13 +18,16 @@ import type { VeilVotePrivateState } from "./types.js";
 
 export type VeilVoteProviders = MidnightProviders<VeilVoteCircuitId, string, VeilVotePrivateState>;
 
-/** Finds the first injected wallet under `window.midnight` (e.g. Lace). */
+/** Finds the Lace wallet under `window.midnight`, preferring it over other
+ * injected Midnight wallets (e.g. 1AM) that may register first. */
 export function findWallet(): InitialAPI | undefined {
   const midnight = (window as unknown as { midnight?: Record<string, unknown> }).midnight;
   if (!midnight) return undefined;
-  return Object.values(midnight).find(
+  const candidates = Object.values(midnight).filter(
     (w): w is InitialAPI => !!w && typeof w === "object" && "apiVersion" in w,
   );
+  const lace = candidates.find((w) => (w as { name?: string }).name?.toLowerCase() === "lace");
+  return lace ?? candidates[0];
 }
 
 /** Turns SDK/wallet errors into a short, user-facing message. */

@@ -11,20 +11,33 @@ _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" b
 | Network  | Address                          |
 |----------|----------------------------------|
 | Preview  | `6adf55bad5c85bcd9531d885c2f8f173f5314ec7fb93667d613955d8911c4eb3` |
-| Preprod  | _[not yet — see note below]_    |
+| Preprod  | `510bab7cc93dbbb34c84a221d819555326d027d21a3b36613dcd7df17ccf4c17` |
 
 > **Deployed on Preview** via the headless CLI ([`scripts/deploy-cli.ts`](scripts/deploy-cli.ts),
-> `npm run deploy:preview`). The contract **compiles**, **all 6 tests pass**, and the
-> frontend **builds with no errors** (confirmed against the compiled contract).
+> `npm run deploy:preview`). **Deployed on Preprod** via the browser wallet (Lace) straight
+> from the frontend's Live wallet mode. The contract **compiles**, **all 6 tests pass**, and
+> the frontend **builds with no errors** (confirmed against the compiled contract).
 >
-> **Preprod specifically remains blocked by a confirmed upstream Midnight issue**, not
-> incomplete work on this repo's part: wallet sync against Preprod throws an internal
-> `Wallet.Sync` error (from `@midnight-ntwrk/wallet-sdk-unshielded-wallet`) partway through,
-> after which it either stalls permanently (Node 22) or the retry loop grows memory
-> unbounded until the process OOMs (Node 24) — reproduced independently on two Node majors,
-> and via both the browser wallet (Lace/1AM) and the headless CLI built specifically to
-> rule out browser-extension flakiness. This matches a broader, still-open pattern of
-> Preprod wallet-sync issues reported on the [Midnight
+> **Update:** the Preprod wallet-sync stall described below did not reproduce once three
+> unrelated local bugs were fixed: the frontend picked whichever Midnight-wallet extension
+> injected first instead of preferring Lace (`findWallet` in
+> [`providers.ts`](frontend/src/midnight/providers.ts)); `setNetworkId()` was never called
+> before wallet/contract operations (`useMidnight.ts`); and `frontend/` and the repo root
+> each held their own separate, physically-distinct install of `@midnight-ntwrk/compact-runtime`
+> / `ledger-v8`, so objects built by one copy's WASM classes (e.g. `ContractMaintenanceAuthority`)
+> failed `instanceof` checks in the other — fixed by converting to npm workspaces with a
+> pinned single `vite` version (see `package.json`'s `overrides`). With those fixed, connecting
+> Lace and deploying to Preprod succeeded end to end (including a real "Prove transaction"
+> signature and a `tNIGHT → tDUST` balance check) without the sync issue below appearing.
+> Kept for reference in case it recurs:
+>
+> Wallet sync against Preprod previously threw an internal `Wallet.Sync` error (from
+> `@midnight-ntwrk/wallet-sdk-unshielded-wallet`) partway through, after which it either
+> stalled permanently (Node 22) or the retry loop grew memory unbounded until the process
+> OOMed (Node 24) — reproduced independently on two Node majors, and via both the browser
+> wallet (Lace/1AM) and the headless CLI built specifically to rule out browser-extension
+> flakiness. This matches a broader, still-open pattern of Preprod wallet-sync issues
+> reported on the [Midnight
 > forum](https://forum.midnight.network/t/wallet-syncing-50-for-3-days-now/742). Switching
 > to Preview (a separate indexer/node/faucet) sidestepped it entirely — Preview's wallet
 > sync completed cleanly on the first real attempt.
