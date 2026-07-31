@@ -6,7 +6,10 @@
 
 ## Live Demo
 
-_[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" below]_
+**https://veilvote-iota.vercel.app/** — opens in **Offline demo** mode, so the full flow
+(deploy → three private votes → two rejections → live tally) runs in your browser with no
+wallet or testnet needed. Switch to **Live wallet** to run it against the deployed Preprod
+contract with Lace.
 
 **Demo video:** [media/veilvote-demo.mp4](media/veilvote-demo.mp4) — a ~70s narrated
 walkthrough of the full flow, the test suite, and CI. See [Demo Video](#demo-video) below.
@@ -309,15 +312,24 @@ veilvote/
 
 ## Initial Idea
 
-_[LEAVE PLACEHOLDER — fill this in manually.]_
+**Private Voting** — anonymous ballots with publicly verifiable tallies, chosen from the
+Level 3 idea list. On a transparent chain every ballot is permanently attributable to an
+address, which pushes members toward voting with the visible majority or abstaining on
+contentious proposals; moving the vote off-chain fixes the privacy but gives up
+verifiability. VeilVote keeps both: the tally is public and auditable, while the link
+between a member and their ballot is never created anywhere.
 
 ## Product Proposal
 
-See [PROPOSAL.md](PROPOSAL.md).
+See [PROPOSAL.md](PROPOSAL.md) — chosen idea, why Midnight, the full data-model
+disclosure table, and a Mainnet feasibility assessment.
 
 ## Screenshots
 
-_[LEAVE PLACEHOLDER — add `compact compile` output and the deployed contract address.]_
+`npm run compact` (contract compiles) and `npm test` (6/6 passing), plus the deployed
+contract addresses:
+
+![compact compile output and 6 passing tests](media/test-output.png)
 
 ## Demo Video
 
