@@ -1,13 +1,15 @@
 # VeilVote
 
+![CI](https://github.com/artomily/veilvote/actions/workflows/ci.yml/badge.svg)
+
 > A privacy-preserving DAO voting contract on Midnight: anonymous, eligibility-checked ballots with cryptographic double-vote protection.
 
 ## Live Demo
 
 _[PASTE LIVE URL AFTER DEPLOYING THE FRONTEND — see "Deploying the frontend" below]_
 
-**Demo video:** [media/veilvote-demo.mp4](media/veilvote-demo.mp4) — a narrated walkthrough of
-the offline demo flow (deploy, three private votes, two rejections).
+**Demo video:** [media/veilvote-demo.mp4](media/veilvote-demo.mp4) — a ~70s narrated
+walkthrough of the full flow, the test suite, and CI. See [Demo Video](#demo-video) below.
 
 ## Contract Address
 
@@ -244,6 +246,14 @@ public state). [`tests/merkle.ts`](tests/merkle.ts) builds the eligibility tree 
 using the contract's own compiled `pureCircuits`, so tests hash exactly the way the
 circuit does.
 
+## CI/CD
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and on
+every pull request: checkout → install Node.js v22 → `npm install` → install the Compact
+compiler and run `compact compile` (`npm run compact`) → run the test suite (`npm test`).
+A green badge at the top of this README means the contract compiles and all tests pass
+against that commit.
+
 ## Deploying the frontend
 
 `vercel.json` (or `netlify.toml`) at the repo root builds the `frontend/` app while
@@ -279,7 +289,7 @@ veilvote/
 │   ├── veilvote-simulator.ts   # in-memory test harness
 │   └── counter.test.ts         # the tests
 ├── scripts/deploy-cli.ts       # headless Preprod deploy (bypasses the browser wallet)
-├── frontend/                   # React + Vite DApp UI (Level 2)
+├── frontend/                   # React + Vite DApp UI
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── WalletConnect.tsx   # connect/disconnect + address display
@@ -290,7 +300,9 @@ veilvote/
 │   │   └── App.tsx
 │   ├── vite.config.ts
 │   └── vercel.json-friendly build (see repo-root vercel.json)
-├── .github/workflows/          # CI/CD (Level 3)
+├── .github/workflows/ci.yml    # CI: compile + test on every push / PR
+├── media/                      # demo video + how it was produced
+├── PROPOSAL.md                 # product proposal
 ├── vercel.json / netlify.toml  # frontend deploy config
 └── README.md
 ```
@@ -299,10 +311,18 @@ veilvote/
 
 _[LEAVE PLACEHOLDER — fill this in manually.]_
 
+## Product Proposal
+
+See [PROPOSAL.md](PROPOSAL.md).
+
 ## Screenshots
 
 _[LEAVE PLACEHOLDER — add `compact compile` output and the deployed contract address.]_
 
 ## Demo Video
 
-_[PLACEHOLDER — add the link after recording. See the demo checklist provided alongside this README for what to capture.]_
+[media/veilvote-demo.mp4](media/veilvote-demo.mp4) — a ~70s narrated walkthrough: the offline
+demo flow (deploy → three private votes → two rejections → live tally), the six-test
+Vitest suite passing, and the CI badge / contract address in this README. Narration is
+macOS `say` (Samantha), video is stills from the running app animated and assembled with
+ffmpeg — see [media/README.md](media/README.md) for how it was built and how to regenerate it.
