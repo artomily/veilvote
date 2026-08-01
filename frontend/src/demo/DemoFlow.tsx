@@ -1,3 +1,4 @@
+import Tally from "../components/Tally.js";
 import { useDemoOrchestrator, type StepStatus } from "./useDemoOrchestrator.js";
 
 const STATUS_ICON: Record<StepStatus, string> = {
@@ -7,8 +8,17 @@ const STATUS_ICON: Record<StepStatus, string> = {
   rejected: "✗",
 };
 
+// Screen-reader text for each marker — the glyphs above are decorative.
+const STATUS_LABEL: Record<StepStatus, string> = {
+  pending: "Pending",
+  active: "In progress",
+  success: "Succeeded",
+  rejected: "Rejected by the contract",
+};
+
 export default function DemoFlow() {
   const { steps, log, ledgerState, proposalIdHex, running, done, run, reset } = useDemoOrchestrator();
+  const settled = steps.filter((s) => s.status === "success" || s.status === "rejected").length;
 
   return (
     <div className="demo-flow">
@@ -20,13 +30,18 @@ export default function DemoFlow() {
           circuit the real contract runs.
         </p>
         <div className="demo-flow__controls">
-          <button onClick={run} disabled={running}>
+          <button className="btn-primary" onClick={run} disabled={running}>
             {running ? "Running…" : done ? "Run again" : "Run demo"}
           </button>
           {(done || log.length > 0) && !running && (
-            <button className="demo-flow__reset" onClick={reset}>
+            <button className="btn-ghost" onClick={reset}>
               Reset
             </button>
+          )}
+          {(running || settled > 0) && (
+            <span className="demo-flow__progress">
+              {settled} / {steps.length} steps
+            </span>
           )}
         </div>
         {proposalIdHex && (
@@ -39,8 +54,9 @@ export default function DemoFlow() {
       <ol className="demo-flow__steps">
         {steps.map((step) => (
           <li key={step.id} className={`demo-flow__step demo-flow__step--${step.status}`}>
-            <span className="demo-flow__step-icon" aria-hidden="true">
-              {STATUS_ICON[step.status]}
+            <span className="demo-flow__step-icon">
+              <span aria-hidden="true">{STATUS_ICON[step.status]}</span>
+              <span className="sr-only">{STATUS_LABEL[step.status]}</span>
             </span>
             <div className="demo-flow__step-body">
               <p className="demo-flow__step-title">{step.title}</p>
@@ -54,18 +70,18 @@ export default function DemoFlow() {
       {ledgerState && (
         <div className="demo-flow__tally">
           <h3>Live tally (public ledger state)</h3>
-          <ul className="app__tally">
-            <li>Yes: {ledgerState.yesVotes.toString()}</li>
-            <li>No: {ledgerState.noVotes.toString()}</li>
-            <li>Ballots cast: {ledgerState.nullifiers.size().toString()}</li>
-          </ul>
+          <Tally
+            yes={ledgerState.yesVotes}
+            no={ledgerState.noVotes}
+            ballots={ledgerState.nullifiers.size()}
+          />
         </div>
       )}
 
       {log.length > 0 && (
         <div className="demo-flow__log">
           <h3>Activity log</h3>
-          <ul>
+          <ul aria-live="polite">
             {log.map((entry) => (
               <li key={entry.id} className={`demo-flow__log-entry demo-flow__log-entry--${entry.kind}`}>
                 {entry.message}

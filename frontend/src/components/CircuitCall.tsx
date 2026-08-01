@@ -13,15 +13,28 @@ export default function CircuitCall({ disabled, busy, lastResult, onCastVote }: 
   return (
     <div className="circuit-call">
       <div className="circuit-call__buttons">
-        <button disabled={disabled || !!busy} onClick={() => onCastVote(true)}>
+        <button
+          className="circuit-call__vote--yes"
+          disabled={disabled || !!busy}
+          onClick={() => onCastVote(true)}
+        >
           Vote Yes
         </button>
-        <button disabled={disabled || !!busy} onClick={() => onCastVote(false)}>
+        <button
+          className="circuit-call__vote--no"
+          disabled={disabled || !!busy}
+          onClick={() => onCastVote(false)}
+        >
           Vote No
         </button>
       </div>
 
-      {busy && <p className="circuit-call__status">{busy}</p>}
+      {busy && (
+        <p className="circuit-call__status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          {busy}
+        </p>
+      )}
 
       {lastResult && (
         <div className="circuit-call__result">

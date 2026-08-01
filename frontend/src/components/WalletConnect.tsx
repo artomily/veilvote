@@ -14,15 +14,20 @@ function truncate(addr: string): string {
 
 export default function WalletConnect({ walletState, address, error, onConnect, onDisconnect }: Props) {
   if (walletState === "detecting") {
-    return <div className="wallet-connect wallet-connect--detecting">Looking for a wallet…</div>;
+    return (
+      <div className="wallet-connect wallet-connect--detecting" aria-live="polite">
+        <span className="spinner" aria-hidden="true" />
+        Looking for a wallet…
+      </div>
+    );
   }
 
   if (walletState === "no-wallet") {
     return (
       <div className="wallet-connect wallet-connect--missing">
-        <p>No Midnight wallet found.</p>
+        <span>No Midnight wallet found.</span>
         <a href="https://docs.midnight.network/develop/tutorial/using/wallet" target="_blank" rel="noreferrer">
-          Install the Lace wallet
+          Install the Lace wallet →
         </a>
       </div>
     );
@@ -32,18 +37,26 @@ export default function WalletConnect({ walletState, address, error, onConnect, 
     return (
       <div className="wallet-connect wallet-connect--connected">
         <span className="wallet-connect__dot" aria-hidden="true" />
-        <span className="wallet-connect__address">{truncate(address)}</span>
-        <button onClick={onDisconnect}>Disconnect</button>
+        <span className="wallet-connect__address" title={address}>
+          {truncate(address)}
+        </span>
+        <button className="btn-ghost" onClick={onDisconnect}>
+          Disconnect
+        </button>
       </div>
     );
   }
 
   return (
     <div className="wallet-connect wallet-connect--disconnected">
-      <button onClick={onConnect} disabled={walletState !== "ready"}>
-        {walletState === "connecting" ? "Connecting…" : "Connect Wallet"}
+      <button className="btn-primary" onClick={onConnect} disabled={walletState !== "ready"}>
+        {walletState === "connecting" ? "Connecting…" : "Connect wallet"}
       </button>
-      {error && <p className="wallet-connect__error">{error}</p>}
+      {error && (
+        <p className="wallet-connect__error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
